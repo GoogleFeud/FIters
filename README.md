@@ -1,8 +1,8 @@
 # FIters
 
-`FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster.
+`FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster, with 0 dependencies, in under 100 lines of code.
 
-**FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is quite expensive, so make sure all calls to `compile` are at the beginning of your code.**
+**FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is quite expensive, so make sure all calls to `compile` are not in loops/functions.**
 
 ## A taste
 
@@ -28,7 +28,7 @@ Iterator([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 ### filter, reduce
 
-Check out the benchmarks for these snippets using `npm run bench` and `npm run bench_raw`. FIters are around 3 times faster.
+Check out the benchmarks for these snippets using `npm run bench` and `npm run bench_raw`. FIters are **much** faster.
 
 #### FIters
 
@@ -77,4 +77,6 @@ iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], value); // [5, 10]
 
 ## How does this work?
 
-The `compile` function gives you a hint - The functions you provide to the methods are stringified and packed in a single loop. The library also does a fair amount of optimizations, too.
+When the `compile` function gets called, all the methods (`map`, `filter`, `reduce`, etc) get put in a single loop, and "compiled" via the `Function` constructor. The library also does a fair amount of optimizations. 
+
+If you want to see the function, `toString()` it.

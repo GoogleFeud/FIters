@@ -54,9 +54,9 @@ export class FIter<T> {
         const varname = this.rngVarname();
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) {
             const varFn = (this.inLoop.pop() as Block).fn;
-            this.inLoop.push({content: `${varname}+=(${this.valName}=(${varFn})(${this.valName}, i))+'${delimiter}'`, fn: varFn, purpose: PURPOSES.JOIN});
+            this.inLoop.push({content: `${varname}+=(${this.valName}=(${varFn})(${this.valName}, i))+(i==l-1?'':'${delimiter}')`, fn: varFn, purpose: PURPOSES.JOIN});
         } else {
-            this.inLoop.push({content: `${varname}+=${this.valName}+'${delimiter}'`, fn: "", purpose: PURPOSES.JOIN});
+            this.inLoop.push({content: `${varname}+=${this.valName}+(i==l-1?'':'${delimiter}')`, fn: "", purpose: PURPOSES.JOIN});
         }
         this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
         this.returnVal = varname;
