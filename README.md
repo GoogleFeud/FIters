@@ -2,7 +2,7 @@
 
 `FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster, with 0 dependencies, in under 100 lines of code.
 
-**FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is quite expensive, so make sure all calls to `compile` are not in loops/functions.**
+**FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is not cheap, so make sure all calls to `compile` are not in loops/functions.**
 
 ## A taste
 
