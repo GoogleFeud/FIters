@@ -7,10 +7,11 @@ export const enum PURPOSES {
     JOIN,
     CONSUME,
     FOREACH,
-    COUNT
+    COUNT,
+    REDUCE
 }
 
-const RETURNS_VALUE = [PURPOSES.JOIN, PURPOSES.CONSUME, PURPOSES.COUNT];
+const RETURNS_VALUE = [PURPOSES.JOIN, PURPOSES.CONSUME, PURPOSES.COUNT, PURPOSES.REDUCE];
 
 export interface Block {
     content: string,
@@ -71,7 +72,7 @@ export class FIter<T> {
         return this;
     }
 
-    forEach(fn: (item: T, index: number) => void) : this {
+    forEach(fn: ((item: T, index: number) => void) | string) : this {
         const strFn = fn.toString();
         this.inLoop.push({content: `(${strFn})(${this.valName}, i)`, fn: strFn, purpose: PURPOSES.FOREACH});
         return this;
@@ -85,10 +86,18 @@ export class FIter<T> {
         return this;
     }
 
+    reduce(fn: ((acc: number, item: T) => number) | string, defaultAcc: number) {
+        const varname = this.rngVarname();
+        const strFn = fn.toString();
+        this.vars.push({varname, initializor: defaultAcc.toString(), purpose: PURPOSES.REDUCE});
+        this.inLoop.push({content: `${varname}=(${strFn})(${varname},${this.valName})`, fn: strFn, purpose: PURPOSES.REDUCE});
+        this.returnVal = varname;
+        return this;
+    }
+
     compile<R>(...args: string[]) : (arr: T[], ...rest: unknown[]) => R {
         if (this.inLoop.length === 0) new Function() as (arr: T[], ...rest: unknown[]) => R; 
-        console.log(`l = arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName} = arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVal};`);
-        return new Function("arr", ...args, `l = arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++) {${this.valName} = arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVal};`) as (arr: T[], ...rest: unknown[]) => R;
+        return new Function("arr", ...args, `l=arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++) {${this.valName} = arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVal};`) as (arr: T[], ...rest: unknown[]) => R;
     }
 
     private rngVarname() : string {
