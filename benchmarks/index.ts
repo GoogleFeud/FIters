@@ -19,6 +19,14 @@ suite.add('Array#filter#map#join', () => {
   data.filter(num => num % 2 === 0).map(num => num * 2).join("\n");
 })
 
+suite.add('for...of', () => {
+    let res = "";
+    for (let i=0; i < data.length; i++) {
+        if (data[i] % 2 !== 0) continue;
+        res += `${data[i]}\n`;
+    }
+})
+
 suite.on('cycle', (event: Benchmark.Event) => {
   console.log(String(event.target));
 });
@@ -28,7 +36,6 @@ suite.on('complete', () => {
 });
 
 suite.run();
-
 
 const filterReduce = new Benchmark.Suite();
 

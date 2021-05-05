@@ -1,4 +1,6 @@
 
+import {parse} from "./FunctionParser";
+
 const ALLOWED_VAR_CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
 
 export const enum PURPOSES {
@@ -15,7 +17,6 @@ const RETURNS_VALUE = [PURPOSES.JOIN, PURPOSES.CONSUME, PURPOSES.COUNT, PURPOSES
 
 export interface Block {
     content: string,
-    // eslint-disable-next-line @typescript-eslint/ban-types
     fn: string,
     purpose: PURPOSES
 }
@@ -27,26 +28,26 @@ export interface Declaration {
 }
 
 export class FIter<T> {
-    private vars: Array<Declaration>
+    private vars: Declaration[]
     private valName: string
-    private inLoop: Array<Block>
-    private returnVal: string
+    private inLoop: Block[]
+    private returnVals: string[]
     constructor(valName?: string) {
         this.vars = [];
         this.inLoop = [];
         this.valName = valName || "_";
-        this.returnVal = "";
+        this.returnVals = [];
     }
 
     filter(fn: ((item: T, index: number) => boolean) | string) : this {
         const strFn = fn.toString();
-        this.inLoop.push({content: `if(!(${strFn})(${this.valName}, i))continue`, purpose: PURPOSES.FILTER, fn: strFn});
+        this.inLoop.push({content: `if(!((${strFn})(${this.valName},i)))continue`, purpose: PURPOSES.FILTER, fn: strFn});
         return this;
     }
 
     map<R>(fn: ((item: T, index: number) => R) | string) : this {
         const strFn = fn.toString();
-        this.inLoop.push({content: `${this.valName} = (${strFn})(${this.valName},i)`, purpose: PURPOSES.MAP, fn: strFn});
+        this.inLoop.push({content: `${this.valName}=(${strFn})(${this.valName},i)`, purpose: PURPOSES.MAP, fn: strFn});
         return this;
     }
 
@@ -54,21 +55,21 @@ export class FIter<T> {
         const varname = this.rngVarname();
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) {
             const varFn = (this.inLoop.pop() as Block).fn;
-            this.inLoop.push({content: `${varname}+=(${this.valName}=(${varFn})(${this.valName}, i))+(i==l-1?'':'${delimiter}')`, fn: varFn, purpose: PURPOSES.JOIN});
-        } else {
-            this.inLoop.push({content: `${varname}+=${this.valName}+(i==l-1?'':'${delimiter}')`, fn: "", purpose: PURPOSES.JOIN});
-        }
+            this.inLoop.push({content: `${varname}+=(${this.valName}=(${varFn})(${this.valName},i))+(i==l-1?'':'${delimiter}')`, fn: varFn, purpose: PURPOSES.JOIN});
+        } else this.inLoop.push({content: `${varname}+=${this.valName}+(i==l-1?'':'${delimiter}')`, fn: "", purpose: PURPOSES.JOIN});
         this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
-        this.returnVal = varname;
+        this.returnVals.push(varname);
         return this;
     }
 
     consume() : this {
-        if (this.inLoop.length && RETURNS_VALUE.includes(this.inLoop[this.inLoop.length - 1].purpose)) return this;
         const varname = this.rngVarname();
         this.vars.push({varname, initializor: "[]", purpose: PURPOSES.CONSUME});
-        this.inLoop.push({content: `${varname}.push(${this.valName})`, fn: "", purpose: PURPOSES.CONSUME});
-        this.returnVal = varname;
+        if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) { 
+            const varFn = (this.inLoop.pop() as Block).fn;
+            this.inLoop.push({content: `${varname}.push((${varFn})(${this.valName}, i))`, fn: "", purpose: PURPOSES.CONSUME});
+        } else this.inLoop.push({content: `${varname}.push(${this.valName})`, fn: "", purpose: PURPOSES.CONSUME});
+        this.returnVals.push(varname);
         return this;
     }
 
@@ -82,7 +83,7 @@ export class FIter<T> {
         const varname = this.rngVarname();
         this.vars.push({varname, initializor: "0", purpose: PURPOSES.COUNT});
         this.inLoop.push({content: `${varname}++`, fn: "", purpose: PURPOSES.COUNT});
-        this.returnVal = varname;
+        this.returnVals.push(varname);
         return this;
     }
 
@@ -90,14 +91,14 @@ export class FIter<T> {
         const varname = this.rngVarname();
         const strFn = fn.toString();
         this.vars.push({varname, initializor: defaultAcc.toString(), purpose: PURPOSES.REDUCE});
-        this.inLoop.push({content: `${varname}=(${strFn})(${varname},${this.valName})`, fn: strFn, purpose: PURPOSES.REDUCE});
-        this.returnVal = varname;
+        this.inLoop.push({content: `${varname}=(${strFn})(${varname}, ${this.valName})`, fn: strFn, purpose: PURPOSES.REDUCE});
+        this.returnVals.push(varname);
         return this;
     }
 
     compile<R>(...args: string[]) : (arr: T[], ...rest: unknown[]) => R {
         if (this.inLoop.length === 0) new Function() as (arr: T[], ...rest: unknown[]) => R; 
-        return new Function("arr", ...args, `l=arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++) {${this.valName} = arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVal};`) as (arr: T[], ...rest: unknown[]) => R;
+        return new Function("arr", ...args, `l=arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
     }
 
     private rngVarname() : string {

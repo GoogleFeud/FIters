@@ -57,6 +57,15 @@ filterAndCount([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 // 5
 ```
 
+### Returning multiple values
+
+```ts
+const Iterator = new FIter<number>().filter(num => num % 2 === 0).count().map(num => num * 2).consume().join("-").compile();
+
+Iterator([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+// Returns [5, [4, 8, 12, 16, 20], '4-8-12-16-20']
+```
+
 ## Some limitations
 
 With the default implementations you can use variables outside of the callback functions just fine, but this is not allowed in `FIters`:
