@@ -13,8 +13,6 @@ export const enum PURPOSES {
     REDUCE
 }
 
-const RETURNS_VALUE = [PURPOSES.JOIN, PURPOSES.CONSUME, PURPOSES.COUNT, PURPOSES.REDUCE];
-
 export interface Block {
     content: string,
     fn: string,
@@ -54,8 +52,8 @@ export class FIter<T> {
     join(delimiter: string) : this {
         const varname = this.rngVarname();
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) {
-            const varFn = (this.inLoop.pop() as Block).fn;
-            this.inLoop.push({content: `${varname}+=(${this.valName}=${varFn})+(i===l-1?'':'${delimiter}')`, fn: varFn, purpose: PURPOSES.JOIN});
+            const varFn = (this.inLoop.pop() as Block).fn + `+(i!==l-1&&'${delimiter}')`;
+            this.inLoop.push({content: `${varname}+=${varFn}`, fn: varFn, purpose: PURPOSES.MAP});
         } else this.inLoop.push({content: `${varname}+=${this.valName}+(i===l-1?'':'${delimiter}')`, fn: "", purpose: PURPOSES.JOIN});
         this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
         this.returnVals.push(varname);
@@ -98,7 +96,12 @@ export class FIter<T> {
 
     compile<R>(...args: string[]) : (arr: T[], ...rest: unknown[]) => R {
         if (this.inLoop.length === 0) new Function() as (arr: T[], ...rest: unknown[]) => R; 
-        return new Function("arr", ...args, `l=arr.length;${this.vars.map(v => `${v.varname}=${v.initializor}`).join(";")};for(i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
+        if (this.inLoop.length === 2 && this.inLoop[0].purpose === PURPOSES.FILTER) {
+            const other = this.inLoop.pop() as Block;
+            const filter = this.inLoop.pop() as Block;
+            this.inLoop.push({content: `if (${filter.fn}) ${other.content}`, fn: "", purpose: PURPOSES.FILTER});
+        }
+        return new Function("arr", ...args, `const l=arr.length;let ${this.valName};${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
     }
 
     private rngVarname() : string {

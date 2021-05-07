@@ -1,6 +1,6 @@
 # FIters
 
-`FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster, with 0 dependencies, in under 100 lines of code.
+`FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster, with 0 dependencies.
 
 **FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is not cheap, so make sure all calls to `compile` are not in loops/functions.**
 
@@ -68,6 +68,8 @@ Iterator([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 ## Some limitations
 
+### No variables outside of the scope
+
 With the default implementations you can use variables outside of the callback functions just fine, but this is not allowed in `FIters`:
 
 ```ts
@@ -83,6 +85,17 @@ const value = 5;
 const iter = new FIter<number>().filter(num => num % value === 0).consume().compile("value");
 iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], value); // [5, 10]
 ```
+
+### Only one-line arrow functions
+
+All functions must be one-liner arrow functions. That means that these patterns are not allowed:
+
+```js
+.method(num => { /* code */ });
+.method(function(num) { /* code */ });
+```
+
+This is because the functions you provide gets turned to a string and then get inlined. The current function parser is very simple and can inline only one-liner functions. 
 
 ## How does this work?
 
