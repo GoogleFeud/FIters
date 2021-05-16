@@ -2,7 +2,7 @@
 
 `FIters` is an experimental javascript library, which is meant to make using array methods like `map`, `filter`, `reduce`, `join` faster, with 0 dependencies.
 
-**FIters will always be faster than using the default array implementations. All functions returned by the `compile` function have an O(n) time complexity, where n is the size of the array. The `compile` function itself is not cheap, so make sure all calls to `compile` are not in loops/functions.**
+**FIters will always be faster than using the default array implementations. The function returned by the `compile` method has an O(n) time complexity and a constant factor of 1. The `compile` function itself is not cheap, so make sure all calls to `compile` are not in loops/functions.**
 
 ## A taste
 
@@ -46,9 +46,15 @@ filterReduceNums([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 // 25
 ```
 
-### Counting elements
+### New arrays
 
-`FIters` also implements the `count` function, which can be used along with `filter`. It should be as fast as using the default filter implementation and the `length` property, but this method **does not** create a new array. To actually get a new array, use the `consume` function.
+`filter` and `map` do NOT create new arrays. To actually get a new array from these functions, you can use the `consume` method after them:
+
+```ts
+const filterNums = new FIter<number>().filter(num => num % 2 === 0).consume().compile();
+```
+
+`FIters` also implements the `count` function, which can be used along with `filter`. It should be as fast as using the default filter implementation and the `length` property, but with a smaller memory footprint.
 
 ```ts
 const filterAndCount = new FIter<number>().filter(num => num % 2 === 0).count().compile();
@@ -65,6 +71,32 @@ const Iterator = new FIter<number>().filter(num => num % 2 === 0).count().map(nu
 Iterator([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 // Returns [5, [4, 8, 12, 16, 20], '4-8-12-16-20']
 ```
+
+```ts
+const Iterator = new FIter<number>()
+.filter(num => num % 2 === 0)
+.min()
+.max()
+.map(num => (num * 2).toString(2))
+.groupBy(binary => binary.length)
+.join(", ")
+.first(false)
+.compile()
+
+// Returns
+[
+  2,
+  10,
+  {
+    '3': [ '100' ],
+    '4': [ '1000', '1100' ],
+    '5': [ '10000', '10100' ]
+  },
+  '100, 1000, 1100, 10000, 10100',
+  '100'
+]
+```
+
 
 ## Some limitations
 
@@ -86,19 +118,26 @@ const iter = new FIter<number>().filter(num => num % value === 0).consume().comp
 iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], value); // [5, 10]
 ```
 
-### Only one-line arrow functions
+### Only arrow function
 
-All functions must be one-liner arrow functions. That means that these patterns are not allowed:
+All functions must be arrow functions. That means that this pattern are not allowed:
 
 ```js
-.method(num => { /* code */ });
 .method(function(num) { /* code */ });
 ```
 
-This is because the functions you provide gets turned to a string and then get inlined. The current function parser is very simple and can inline only one-liner functions. 
+This is because the functions you provide gets turned to a string and then get inlined. The current function parser is very simple and can inline only arrow functions. 
+
+Arrow functions with multiple expressions (`() => { ... }`) cannot be inlined, therefore they're slower and should be avoided. If you REALLY want to execute multiple expressions and keep the performance, you can use this:
+
+```
+() => (expression1, expression2, expression3)
+```
+
+`expression3` always gets returned.
 
 ## How does this work?
 
 When the `compile` function gets called, all the methods (`map`, `filter`, `reduce`, etc) get put in a single loop, and "compiled" via the `Function` constructor. The library also does a fair amount of optimizations. 
 
-If you want to see the function, `toString()` it.
+The library also parses the functions you provide to the methods and tries to inline them, extracting the expression from the function and replacing all parameter names.

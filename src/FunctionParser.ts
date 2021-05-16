@@ -22,16 +22,21 @@ export function parse(fn: string, parseMap: string[]) : string {
     // The function params
     const params: string[] = [];
 
+    let isPrevArrow = false;
     for (let i=0; i < fnLen + 1; i++) {
         const char = fn[i];
 
         // If the next token is => and the state is params, transition to the other state
         if (char === "=" && fn[i + 1] === ">" && state === PARSE_STATE.PARAMS) {
             state = PARSE_STATE.EXP;
+            isPrevArrow = true;
             // Skip over the =>
             i++;
             continue;
         }
+
+        // Cancel the optimization if the function has multiple expressions
+        if (isPrevArrow && char === "{") return `(${fn})(${parseMap.join(",")})`;
 
         // Toggle string mode
         if (char === "\"") in_str = !in_str;
@@ -54,7 +59,10 @@ export function parse(fn: string, parseMap: string[]) : string {
         if (char) {
         if (in_str) res += char;
         else {
-            if (state !== PARSE_STATE.PARAMS && (char !== " " && char !== "\n" && char !== ";")) res += char;
+            if (state !== PARSE_STATE.PARAMS && (char !== " " && char !== "\n" && char !== ";")) {
+            res += char;
+            isPrevArrow = false;
+            }
         }
         }
 

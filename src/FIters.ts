@@ -10,7 +10,11 @@ export const enum PURPOSES {
     CONSUME,
     FOREACH,
     COUNT,
-    REDUCE
+    REDUCE,
+    FIRST,
+    MAX,
+    MIN,
+    GROUP_BY
 }
 
 export interface Block {
@@ -43,20 +47,20 @@ export class FIter<T> {
         return this;
     }
 
-    map<R>(fn: ((item: T, index: number) => R) | string) : this {
+    map<R>(fn: ((item: T, index: number) => R) | string) : FIter<R> {
         const strFn = parse(fn.toString(), [this.valName, "i"]);
         this.inLoop.push({content: `${this.valName}=${strFn}`, purpose: PURPOSES.MAP, fn: strFn});
-        return this;
+        return this as unknown as FIter<R>;
     }
 
     join(delimiter: string) : this {
         const varname = this.rngVarname();
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) {
-            const varFn = (this.inLoop.pop() as Block).fn + `+(i!==l-1&&'${delimiter}')`;
+            const varFn = (this.inLoop.pop() as Block).fn + `+'${delimiter}'`;
             this.inLoop.push({content: `${varname}+=${varFn}`, fn: varFn, purpose: PURPOSES.MAP});
-        } else this.inLoop.push({content: `${varname}+=${this.valName}+(i===l-1?'':'${delimiter}')`, fn: "", purpose: PURPOSES.JOIN});
+        } else this.inLoop.push({content: `${varname}+=${this.valName}+'${delimiter}'`, fn: "", purpose: PURPOSES.JOIN});
         this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
-        this.returnVals.push(varname);
+        this.returnVals.push(`${varname}.slice(0, ${varname}.length-${delimiter.length})`);
         return this;
     }
 
@@ -72,8 +76,8 @@ export class FIter<T> {
     }
 
     forEach(fn: ((item: T, index: number) => void) | string) : this {
-        const strFn = fn.toString();
-        this.inLoop.push({content: `(${strFn})(${this.valName}, i)`, fn: strFn, purpose: PURPOSES.FOREACH});
+        const strFn = parse(fn.toString(), [this.valName, "i"]);
+        this.inLoop.push({content: strFn, fn: strFn, purpose: PURPOSES.FOREACH});
         return this;
     }
 
@@ -85,7 +89,7 @@ export class FIter<T> {
         return this;
     }
 
-    reduce(fn: ((acc: number, item: T) => number) | string, defaultAcc: number) {
+    reduce(fn: ((acc: number, item: T) => number) | string, defaultAcc: number) : this {
         const varname = this.rngVarname();
         const strFn = parse(fn.toString(), [varname, this.valName]);
         this.vars.push({varname, initializor: defaultAcc.toString(), purpose: PURPOSES.REDUCE});
@@ -93,15 +97,51 @@ export class FIter<T> {
         this.returnVals.push(varname);
         return this;
     }
+    
+    first(immediate = true) : this {
+        if (immediate) this.inLoop.push({content: `return ${this.valName}`, fn: "", purpose: PURPOSES.FIRST});
+        else {
+            const varname = this.rngVarname();
+            this.vars.push({varname, initializor: "this", purpose: PURPOSES.FIRST});
+            this.inLoop.push({content: `if (${varname}===this)${varname}=${this.valName}`, fn: "", purpose: PURPOSES.FIRST});
+            this.returnVals.push(varname);
+        }
+        return this;
+    }
 
-    compile<R>(...args: string[]) : (arr: T[], ...rest: unknown[]) => R {
+    max() : this {
+        const varname = this.rngVarname();
+        this.vars.push({varname, initializor: "0", purpose: PURPOSES.MAX});
+        this.inLoop.push({content: `if(${this.valName}>${varname}) ${varname}=${this.valName}`, fn: "", purpose: PURPOSES.MAX});
+        this.returnVals.push(varname);
+        return this;
+    }
+
+    min() : this {
+        const varname = this.rngVarname();
+        this.vars.push({varname, initializor: "Infinity", purpose: PURPOSES.MIN});
+        this.inLoop.push({content: `if(${this.valName}<${varname}) ${varname}=${this.valName}`, fn: "", purpose: PURPOSES.MAX});
+        this.returnVals.push(varname);
+        return this;
+    }
+
+    groupBy(fn: ((item: T, index: number) => void) | string) : this {
+        const fnstr = parse(fn.toString(), [this.valName, "i"]);
+        const varname = this.rngVarname();
+        this.vars.push({varname, initializor: "{}", purpose: PURPOSES.MAX});
+        this.inLoop.push({content: `${varname}[${fnstr}]?${varname}[${fnstr}].push(${this.valName}):${varname}[${fnstr}]=[${this.valName}]`, fn: "", purpose: PURPOSES.GROUP_BY});
+        this.returnVals.push(varname);
+        return this;
+    }
+
+    compile<T, R>(...args: string[]) : (arr: T[], ...rest: unknown[]) => R {
         if (this.inLoop.length === 0) new Function() as (arr: T[], ...rest: unknown[]) => R; 
         if (this.inLoop.length === 2 && this.inLoop[0].purpose === PURPOSES.FILTER) {
             const other = this.inLoop.pop() as Block;
             const filter = this.inLoop.pop() as Block;
             this.inLoop.push({content: `if (${filter.fn}) ${other.content}`, fn: "", purpose: PURPOSES.FILTER});
         }
-        return new Function("arr", ...args, `const l=arr.length;let ${this.valName};${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
+        return new Function("arr", ...args, `let l=arr.length;let ${this.valName};${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
     }
 
     private rngVarname() : string {

@@ -15,15 +15,18 @@ suite.add('FIters#filter#map#join', () => {
   Iterator(data);
 });
 
-
-suite.add('for loop', () => {
+const fForLoop = (d: Array<number>) => {
   let res = "";
-  const len = data.length;
+  const len = d.length;
   for (let i=0; i < len; i++) {
-      const item = data[i];
+      const item = d[i];
       if (!(item % 2 === 0)) continue;
       res += item + (i === len - 1 ? '':`\n`);
   }
+}
+
+suite.add('for loop', () => {
+  fForLoop(data);
 })
  
 suite.add("only reduce", () => {
@@ -56,13 +59,17 @@ const filterReduce = new Benchmark.Suite();
 
 const filterReduceNums = new FIter<number>().filter(num => num % 2 !== 0).reduce((acc, num) => acc + num, 0).compile();
 
+const tForLoop = (d: Array<number>) => {
+  let acc = 0;
+  const len = d.length;
+  for (let i=0; i < len; i++) {
+      const item = d[i];
+      if (item % 2 !== 0) acc += item;
+  }
+}
+
 filterReduce.add("for loop", () => {
-    let acc = 0;
-    const len = data.length;
-    for (let i=0; i < len; i++) {
-        const item = data[i];
-        if (item % 2 !== 0) acc += item;
-    }
+    tForLoop(data);
 });
 
 filterReduce.add("FIters#filter#reduce", () => {
@@ -87,3 +94,35 @@ filterReduce.on('cycle', (event: Benchmark.Event) => {
 });
   
 filterReduce.run();
+
+const mapGroup = new Benchmark.Suite();
+
+const mapGroupNums = new FIter<number>().map(num => num.toString(16)).groupBy(num => num[0]).compile();
+
+const t2ForLoop = (d: Array<number>) => {
+    const map: Record<string, string[]> = {};
+  const len = d.length;
+  for (let i=0; i < len; i++) {
+      const item = data[i].toString(16);
+      if (map[item[0]]) map[item[0]].push(item)
+      else map[item[0]] = [item];
+  }
+}
+
+mapGroup.add("for loop", () => {
+  t2ForLoop(data);
+});
+
+mapGroup.add("FIters#map#groupBy", () => {
+  mapGroupNums(data);
+});
+
+mapGroup.on('cycle', (event: Benchmark.Event) => {
+  console.log(String(event.target));
+});
+
+mapGroup.on('complete', () => {
+  console.log('Fastest is ' + mapGroup.filter('fastest').map('name'));
+});
+
+mapGroup.run();
