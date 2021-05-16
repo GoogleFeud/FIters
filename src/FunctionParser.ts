@@ -10,6 +10,7 @@ export const enum PARSE_STATE {
 // - Removes any uneeded characters (empty spaces, new lines)
 // - Only works for arrow functions
 export function parse(fn: string, parseMap: string[]) : string {
+    if (fn.startsWith("function")) return `(${fn})(${parseMap.join(",")})`;
     fn += " ";
     const fnLen = fn.length;
     let res = "";

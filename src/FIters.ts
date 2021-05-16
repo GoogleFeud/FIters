@@ -60,7 +60,7 @@ export class FIter<T> {
             this.inLoop.push({content: `${varname}+=${varFn}`, fn: varFn, purpose: PURPOSES.MAP});
         } else this.inLoop.push({content: `${varname}+=${this.valName}+'${delimiter}'`, fn: "", purpose: PURPOSES.JOIN});
         this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
-        this.returnVals.push(`${varname}.slice(0, ${varname}.length-${delimiter.length})`);
+        this.returnVals.push(`${varname}.slice(0, ${varname}.length-${delimiter.length - 1})`);
         return this;
     }
 
@@ -141,7 +141,7 @@ export class FIter<T> {
             const filter = this.inLoop.pop() as Block;
             this.inLoop.push({content: `if (${filter.fn}) ${other.content}`, fn: "", purpose: PURPOSES.FILTER});
         }
-        return new Function("arr", ...args, `let l=arr.length;let ${this.valName};${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
+        return new Function("arr", ...args, `let l=arr.length;${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){let ${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
     }
 
     private rngVarname() : string {

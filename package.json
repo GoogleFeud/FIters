@@ -1,5 +1,5 @@
 {
-  "name": "FIters",
+  "name": "f-iters",
   "version": "1.0.0",
   "description": "Faster js array methods (filter, map, etc.)",
   "main": "dist/index.js",

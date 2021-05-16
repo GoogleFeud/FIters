@@ -118,23 +118,29 @@ const iter = new FIter<number>().filter(num => num % value === 0).consume().comp
 iter([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], value); // [5, 10]
 ```
 
-### Only arrow function
+### Single-expression arrow functions are recommended
 
-All functions must be arrow functions. That means that this pattern are not allowed:
+You can pass a function in any way you want:
 
 ```js
 .method(function(num) { /* code */ });
+.method(() => { /* code */ });
+.method(() => /* code */);
 ```
 
-This is because the functions you provide gets turned to a string and then get inlined. The current function parser is very simple and can inline only arrow functions. 
+But it's highly recommended to pass only a single-expression arrow functions (`() => ...`) because those can be easily **inlined**, which means one less function call. The current function parser can only inline those. 
 
-Arrow functions with multiple expressions (`() => { ... }`) cannot be inlined, therefore they're slower and should be avoided. If you REALLY want to execute multiple expressions and keep the performance, you can use this:
+You can execute multiple expressions in a single-expression arrow function like this:
 
 ```
-() => (expression1, expression2, expression3)
+() => (1 + 1, 2 + 2, 3 + 3)
 ```
 
-`expression3` always gets returned.
+The return value of the function will be `6`.
+
+### Security
+
+You should NOT pass functions / strings that could possibly be unsafe / taken from an external source. 
 
 ## How does this work?
 
