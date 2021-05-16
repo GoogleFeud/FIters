@@ -7,7 +7,7 @@ for (let i=0; i < 10000; i++) {
     data.push(i);
 }
 
-const Iterator = new FIter<number>().filter(num => num % 2 === 0).map(num => num * 2).join("\\n").compile();
+const Iterator = new FIter<number>().filter(num => num % 2 === 0).map(num => num * 2).join("\n").compile();
 
 const suite = new Benchmark.Suite();
 

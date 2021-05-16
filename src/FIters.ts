@@ -26,6 +26,7 @@ export interface Block {
 export interface Declaration {
     varname: string,
     initializor: string,
+    type: "let"|"const"|"",
     purpose: PURPOSES
 }
 
@@ -54,19 +55,20 @@ export class FIter<T> {
     }
 
     join(delimiter: string) : this {
+        const raw = delimiter.replace(/\n/, "\\n");
         const varname = this.rngVarname();
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) {
-            const varFn = (this.inLoop.pop() as Block).fn + `+'${delimiter}'`;
+            const varFn = (this.inLoop.pop() as Block).fn + `+'${raw}'`;
             this.inLoop.push({content: `${varname}+=${varFn}`, fn: varFn, purpose: PURPOSES.MAP});
-        } else this.inLoop.push({content: `${varname}+=${this.valName}+'${delimiter}'`, fn: "", purpose: PURPOSES.JOIN});
-        this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN});
-        this.returnVals.push(`${varname}.slice(0, ${varname}.length-${delimiter.length - 1})`);
+        } else this.inLoop.push({content: `${varname}+=${this.valName}+'${raw}'`, fn: "", purpose: PURPOSES.JOIN});
+        this.vars.push({varname, initializor: "''", purpose: PURPOSES.JOIN, type:"let"});
+        this.returnVals.push(`${varname}.slice(0, ${varname}.length-${delimiter.length})`);
         return this;
     }
 
     consume() : this {
         const varname = this.rngVarname();
-        this.vars.push({varname, initializor: "[]", purpose: PURPOSES.CONSUME});
+        this.vars.push({varname, initializor: "[]", purpose: PURPOSES.CONSUME, type:"const"});
         if (this.inLoop.length && this.inLoop[this.inLoop.length - 1].purpose === PURPOSES.MAP) { 
             const varFn = (this.inLoop.pop() as Block).fn;
             this.inLoop.push({content: `${varname}.push(${varFn})`, fn: "", purpose: PURPOSES.CONSUME});
@@ -74,6 +76,7 @@ export class FIter<T> {
         this.returnVals.push(varname);
         return this;
     }
+
 
     forEach(fn: ((item: T, index: number) => void) | string) : this {
         const strFn = parse(fn.toString(), [this.valName, "i"]);
@@ -83,7 +86,7 @@ export class FIter<T> {
 
     count() : this {
         const varname = this.rngVarname();
-        this.vars.push({varname, initializor: "0", purpose: PURPOSES.COUNT});
+        this.vars.push({varname, initializor: "0", purpose: PURPOSES.COUNT, type: "let"});
         this.inLoop.push({content: `${varname}++`, fn: "", purpose: PURPOSES.COUNT});
         this.returnVals.push(varname);
         return this;
@@ -92,7 +95,7 @@ export class FIter<T> {
     reduce(fn: ((acc: number, item: T) => number) | string, defaultAcc: number) : this {
         const varname = this.rngVarname();
         const strFn = parse(fn.toString(), [varname, this.valName]);
-        this.vars.push({varname, initializor: defaultAcc.toString(), purpose: PURPOSES.REDUCE});
+        this.vars.push({varname, initializor: defaultAcc.toString(), purpose: PURPOSES.REDUCE, type: "let"});
         this.inLoop.push({content: `${varname}=${strFn}`, fn: strFn, purpose: PURPOSES.REDUCE});
         this.returnVals.push(varname);
         return this;
@@ -102,7 +105,7 @@ export class FIter<T> {
         if (immediate) this.inLoop.push({content: `return ${this.valName}`, fn: "", purpose: PURPOSES.FIRST});
         else {
             const varname = this.rngVarname();
-            this.vars.push({varname, initializor: "this", purpose: PURPOSES.FIRST});
+            this.vars.push({varname, initializor: "this", purpose: PURPOSES.FIRST, type: "let"});
             this.inLoop.push({content: `if (${varname}===this)${varname}=${this.valName}`, fn: "", purpose: PURPOSES.FIRST});
             this.returnVals.push(varname);
         }
@@ -111,7 +114,7 @@ export class FIter<T> {
 
     max() : this {
         const varname = this.rngVarname();
-        this.vars.push({varname, initializor: "0", purpose: PURPOSES.MAX});
+        this.vars.push({varname, initializor: "0", purpose: PURPOSES.MAX, type: "let"});
         this.inLoop.push({content: `if(${this.valName}>${varname}) ${varname}=${this.valName}`, fn: "", purpose: PURPOSES.MAX});
         this.returnVals.push(varname);
         return this;
@@ -119,7 +122,7 @@ export class FIter<T> {
 
     min() : this {
         const varname = this.rngVarname();
-        this.vars.push({varname, initializor: "Infinity", purpose: PURPOSES.MIN});
+        this.vars.push({varname, initializor: "Infinity", purpose: PURPOSES.MIN, type: "let"});
         this.inLoop.push({content: `if(${this.valName}<${varname}) ${varname}=${this.valName}`, fn: "", purpose: PURPOSES.MAX});
         this.returnVals.push(varname);
         return this;
@@ -128,7 +131,7 @@ export class FIter<T> {
     groupBy(fn: ((item: T, index: number) => void) | string) : this {
         const fnstr = parse(fn.toString(), [this.valName, "i"]);
         const varname = this.rngVarname();
-        this.vars.push({varname, initializor: "{}", purpose: PURPOSES.MAX});
+        this.vars.push({varname, initializor: "{}", purpose: PURPOSES.GROUP_BY, type: "const"});
         this.inLoop.push({content: `${varname}[${fnstr}]?${varname}[${fnstr}].push(${this.valName}):${varname}[${fnstr}]=[${this.valName}]`, fn: "", purpose: PURPOSES.GROUP_BY});
         this.returnVals.push(varname);
         return this;
@@ -141,9 +144,9 @@ export class FIter<T> {
             const filter = this.inLoop.pop() as Block;
             this.inLoop.push({content: `if (${filter.fn}) ${other.content}`, fn: "", purpose: PURPOSES.FILTER});
         }
-        return new Function("arr", ...args, `let l=arr.length;${this.vars.map(v => `let ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){let ${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
+        return new Function("arr", ...args, `let l=arr.length;${this.vars.map(v => `${v.type} ${v.varname}=${v.initializor}`).join(";")};for(let i=0;i<l;i++){let ${this.valName}=arr[i];${this.inLoop.map(block => block.content).join(";")}};return ${this.returnVals.length === 1 ? this.returnVals[0]:`[${this.returnVals.join(",")}]`};`) as (arr: T[], ...rest: unknown[]) => R;
     }
-
+    
     private rngVarname() : string {
         const charLen = ALLOWED_VAR_CHARACTERS.length - 1;
         let id = ALLOWED_VAR_CHARACTERS[rngBtw(0, charLen)] + ALLOWED_VAR_CHARACTERS[rngBtw(0, charLen)] + rngBtw(0, 9);
